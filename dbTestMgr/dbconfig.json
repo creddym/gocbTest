@@ -1,0 +1,8 @@
+{
+   "url":"couchbase://localhost/bucket",
+   "bucket":"bucket",
+   "user":"user",
+   "passwd":"passwd",
+   "numOfConn":8,
+   "tolelateLatencyMs":100
+}

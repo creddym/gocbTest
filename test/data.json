@@ -1,0 +1,25 @@
+{
+  "gpsis": ["msisdn-{{$supi}}"],
+  "internalGroupIds": ["1"],
+  "micoAllowed": true,
+  "nssai": {
+    "defaultSingleNssais": [{
+      "sd": "000002",
+      "sst": 2
+    }],
+    "singleNssais": [{
+      "sd": "000001",
+      "sst": 1
+    }, {
+      "sd": "000003",
+      "sst": 3
+    }]
+  },
+  "subscribedUeAmbr": {
+    "downlink": "910 Mbps",
+    "uplink": "910 Mbps"
+  },
+  "plmnAmData": {
+    "405-05": {}
+  }
+}
