@@ -11,11 +11,17 @@ configure DB details (edit dbconfig.json as required)
 
 {
    "url":"couchbase://localhost/bucket",
+   
    "bucket":"bucket",
+   
    "user":"user",
+   
    "passwd":"passwd",
+   
    "numOfConn":8,
+   
    "tolelateLatencyMs":100   // accepted/tolerated latency in milliseconds for  my application.
+
 }
 
 Run dbMgr
