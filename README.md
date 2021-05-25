@@ -10,7 +10,8 @@ configure DB details (edit dbconfig.json as required)
 -bash-4.2$ cat dbconfig.json
 
 {
-   "url":"couchbase://localhost/bucket",
+  
+  "url":"couchbase://localhost/bucket",
    
    "bucket":"bucket",
    
