@@ -1,2 +1,2 @@
-curl -v -X PUT -T data.json http://localhost:8080/key1
-curl -v -X GET http://localhost:8080/provision/key
+curl -v -X PUT -T data.json http://localhost:8080/provision/key1
+curl -v -X GET http://localhost:8080/provision/provision/key1
