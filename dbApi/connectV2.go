@@ -2,23 +2,12 @@ package dbApi
 
 import (
 	"github.com/couchbase/gocb/v2"
+	cfg "gocbtest/config"
 	"log"
 	"math/rand"
 	"sync"
 	"time"
 )
-
-type CouchDbCfg_t struct {
-	Url               string `json:"url"`
-	Bucket            string `json:"bucket"`
-	User              string `json:"user"`
-	Passwd            string `json:"passwd"`
-	NumOfConn         int    `json:"numOfConn"`
-	TolelateLatencyMs int    `json:"tolelateLatencyMs"`
-}
-
-// global DB config
-var CouchDbCfg CouchDbCfg_t
 
 type CoucDbConnV2_t struct {
 	Cluster    *gocb.Cluster
@@ -29,20 +18,6 @@ type CoucDbConnV2_t struct {
 // these are safe to use concurrently acc to doc
 var CoucDBConnListV2 map[int]CoucDbConnV2_t
 
-// Default it creates 1 connection
-const DEFAULT_MAX_COUCHDB_CONN = 1
-
-// will be set  by application as required
-var MaxCouchDbConn int
-
-func setMaxCouchDbConn(numOfConn int) {
-	MaxCouchDbConn = numOfConn
-	if MaxCouchDbConn <= 0 {
-		MaxCouchDbConn = DEFAULT_MAX_COUCHDB_CONN
-	}
-	CoucDBConnListV2 = make(map[int]CoucDbConnV2_t, MaxCouchDbConn)
-}
-
 func GetCollection() (*gocb.Collection, int) {
 	idx := rand.Intn(MaxCouchDbConn)
 	return CoucDBConnListV2[idx].Collection, idx
@@ -50,8 +25,10 @@ func GetCollection() (*gocb.Collection, int) {
 
 func ConnectToCBv2(url, bucketName, userName, passWd string) (CoucDbConnV2_t, error) {
 	lCBConn := CoucDbConnV2_t{Cluster: nil, Collection: nil, Mutex: &sync.Mutex{}}
-	couchUrl := url
-	//gocb.SetLogger(gocb.VerboseStdioLogger())
+	couchURL := url
+	if cfg.GetEnableLog() {
+		gocb.SetLogger(gocb.VerboseStdioLogger())
+	}
 	clusterOptions := gocb.ClusterOptions{
 		Authenticator: gocb.PasswordAuthenticator{
 			Username: userName,
@@ -65,7 +42,7 @@ func ConnectToCBv2(url, bucketName, userName, passWd string) (CoucDbConnV2_t, er
 			Disabled: true,
 		},
 	}
-	lCluster, err := gocb.Connect(couchUrl, clusterOptions)
+	lCluster, err := gocb.Connect(couchURL, clusterOptions)
 	if err != nil || lCluster == nil {
 		log.Print("Couchbase cluster object creation failed with err:", err)
 		return lCBConn, err
@@ -82,13 +59,17 @@ func ConnectToCBv2(url, bucketName, userName, passWd string) (CoucDbConnV2_t, er
 	return lCBConn, err
 }
 
-func CreateCouchDBConnectionsV2(couchDbCfg CouchDbCfg_t) int {
-	url := couchDbCfg.Url
+func CreateCouchDBConnectionsV2(couchDbCfg cfg.Db) int {
+	url := couchDbCfg.URL
 	bucketName := couchDbCfg.Bucket
 	userName := couchDbCfg.User
 	passWd := couchDbCfg.Passwd
 	numOfConn := couchDbCfg.NumOfConn
-	setMaxCouchDbConn(numOfConn)
+	MaxCouchDbConn = numOfConn
+	if MaxCouchDbConn <= 0 {
+		MaxCouchDbConn = DEFAULT_MAX_COUCHDB_CONN
+	}
+	CoucDBConnListV2 = make(map[int]CoucDbConnV2_t, MaxCouchDbConn)
 
 	connSucc := 0
 	for i := 0; i < numOfConn; i++ {
@@ -105,7 +86,7 @@ func CreateCouchDBConnectionsV2(couchDbCfg CouchDbCfg_t) int {
 	return connSucc
 }
 
-func CloseDbConnections() {
+func CloseDbConnectionsV2() {
 	for _, lConn := range CoucDBConnListV2 {
 		lCluster := lConn.Cluster
 		if lCluster != nil {

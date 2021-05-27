@@ -1,0 +1,17 @@
+{
+   "app":{
+      "port":8081,
+      "profilePort":6061,
+      "logLevel":"DEBUG"
+   },
+   "db":{
+      "url":"couchbase://crdl.host",
+      "bucket":"db",
+      "user":"user",
+      "passwd":"passwd",
+      "numOfConn":8,
+      "tolelateLatencyMs":100,
+      "enableLog":false,
+      "gocbSdkVersion":"v2"
+   }
+}

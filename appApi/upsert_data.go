@@ -25,7 +25,7 @@ func UpsertData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	dbKey := cc.KEY_PREFIX + cc.KEYSEP + key
-	_, err = dbApi.UpsertDocV2(dbKey, data, 0)
+	_, err = dbApi.UpsertDoc(dbKey, data, 0)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

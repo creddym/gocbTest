@@ -5,9 +5,11 @@ import (
 	"fmt"
 	appApi "gocbtest/appApi"
 	cc "gocbtest/common"
+	cfg "gocbtest/config"
 	dbApi "gocbtest/dbApi"
 	"io/ioutil"
 	//"github.com/gorilla/mux"
+	"flag"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"log"
@@ -16,6 +18,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"strconv"
 	"syscall"
 )
 
@@ -27,6 +30,9 @@ func init() {
 
 func main() {
 
+	cfgFilePath := flag.String("config", "", "application configuration file")
+	flag.Parse()
+
 	errs := make(chan error)
 	go func() {
 		c := make(chan os.Signal)
@@ -35,27 +41,28 @@ func main() {
 	}()
 
 	//Read DB configuration
-	dbCfgFile, err := os.Open("dbconfig.json")
+	cfgFile, err := os.Open(*cfgFilePath)
 	if err != nil {
 		log.Println("Check DB configuration - stopping server")
 	}
-	defer dbCfgFile.Close()
-	dbCfgBytes, _ := ioutil.ReadAll(dbCfgFile)
-	err = json.Unmarshal(dbCfgBytes, &dbApi.CouchDbCfg)
+	defer cfgFile.Close()
+	cfgBytes, _ := ioutil.ReadAll(cfgFile)
+	err = json.Unmarshal(cfgBytes, &cfg.AppCfg)
 	if err != nil {
-		log.Println("Check DB configuration - stopping server")
+		log.Println("Check application configuration - stopping server")
 	}
+	log.Println("App config:\n", string(cfgBytes))
 
 	// Create DB connections
-	connected := dbApi.CreateCouchDBConnectionsV2(dbApi.CouchDbCfg)
-	if connected != dbApi.CouchDbCfg.NumOfConn {
+	connected := dbApi.CreateCouchDBConnections(cfg.AppCfg.Db)
+	if connected != cfg.AppCfg.Db.NumOfConn {
 		log.Println("Check DB connections - stopping server")
 		return
 	}
 
 	// Start server
 	go func() {
-		connPort := ":8080"
+		connPort := ":" + strconv.Itoa(cfg.GetAppPort())
 		log.Println("Running server..., port=", connPort)
 		router := appApi.NewRouter()
 		h2s := &http2.Server{}
@@ -67,7 +74,9 @@ func main() {
 	}()
 
 	// For profiling
-	go StartProfileServer("localhost", "7061")
+	profilePort := strconv.Itoa(cfg.GetPorfilePort())
+	log.Println("Running profile server..., port=", profilePort)
+	go StartProfileServer("localhost", profilePort)
 
 	//select {}
 	err = <-errs

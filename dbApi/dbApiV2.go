@@ -2,7 +2,7 @@ package dbApi
 
 import (
 	"errors"
-	gocbV2 "github.com/couchbase/gocb/v2"
+	"github.com/couchbase/gocb/v2"
 	cc "gocbtest/common"
 	"log"
 	"strings"
@@ -11,10 +11,10 @@ import (
 
 //Options global variable
 var (
-	GetOptions = &gocbV2.GetOptions{}
+	GetOptions = &gocb.GetOptions{}
 )
 
-func GetDocV2(key string) (interface{}, gocbV2.Cas, error) {
+func GetDocV2(key string) (interface{}, gocb.Cas, error) {
 	if collection, idx := GetCollection(); collection != nil {
 		startTime := time.Now()
 		result, err := collection.Get(key, GetOptions)
@@ -42,9 +42,9 @@ func GetDocV2(key string) (interface{}, gocbV2.Cas, error) {
 	}
 }
 
-func InsertDocV2(key string, value interface{}, expiry time.Duration) (gocbV2.Cas, error) {
+func InsertDocV2(key string, value interface{}, expiry time.Duration) (gocb.Cas, error) {
 	if collection, idx := GetCollection(); collection != nil {
-		var insertOptions gocbV2.InsertOptions
+		var insertOptions gocb.InsertOptions
 		insertOptions.Expiry = expiry
 		startTime := time.Now()
 		mutateResult, err := collection.Insert(key, value, &insertOptions)
@@ -65,9 +65,9 @@ func InsertDocV2(key string, value interface{}, expiry time.Duration) (gocbV2.Ca
 	}
 }
 
-func UpsertDocV2(key string, value interface{}, expiry time.Duration) (gocbV2.Cas, error) {
+func UpsertDocV2(key string, value interface{}, expiry time.Duration) (gocb.Cas, error) {
 	if collection, idx := GetCollection(); collection != nil {
-		var upsertOptions gocbV2.UpsertOptions
+		var upsertOptions gocb.UpsertOptions
 		upsertOptions.Expiry = expiry
 		startTime := time.Now()
 		mutateResult, err := collection.Upsert(key, value, &upsertOptions)
@@ -89,10 +89,10 @@ func UpsertDocV2(key string, value interface{}, expiry time.Duration) (gocbV2.Ca
 	}
 }
 
-func UpsertDocWithCasV2(key string, cas gocbV2.Cas, value interface{},
-	expiry time.Duration) (gocbV2.Cas, error) {
+func UpsertDocWithCasV2(key string, cas gocb.Cas, value interface{},
+	expiry time.Duration) (gocb.Cas, error) {
 	if collection, idx := GetCollection(); collection != nil {
-		var replaceOptions gocbV2.ReplaceOptions
+		var replaceOptions gocb.ReplaceOptions
 		replaceOptions.Expiry = expiry
 		replaceOptions.Cas = cas
 		startTime := time.Now()
@@ -115,9 +115,9 @@ func UpsertDocWithCasV2(key string, cas gocbV2.Cas, value interface{},
 	}
 }
 
-func DeleteDocV2(key string, cas gocbV2.Cas) (gocbV2.Cas, error) {
+func DeleteDocV2(key string, cas gocb.Cas) (gocb.Cas, error) {
 	if collection, idx := GetCollection(); collection != nil {
-		var removeOptions = &gocbV2.RemoveOptions{
+		var removeOptions = &gocb.RemoveOptions{
 			Cas: cas,
 		}
 		startTime := time.Now()
@@ -141,19 +141,19 @@ func DeleteDocV2(key string, cas gocbV2.Cas) (gocbV2.Cas, error) {
 }
 
 // Multi key DB APIs
-type Result2 struct {
+type ResultV2 struct {
 	Doc    interface{}
-	Cas    gocbV2.Cas
+	Cas    gocb.Cas
 	Expiry uint32
 	Err    error
 }
 
-func GetMultiDocV2(keys []string) (map[string]Result2, error) {
-	resp := make(map[string]Result2)
+func GetMultiDocV2(keys []string) (map[string]ResultV2, error) {
+	resp := make(map[string]ResultV2)
 	if collection, idx := GetCollection(); collection != nil {
-		ops := make([]gocbV2.BulkOp, len(keys))
+		ops := make([]gocb.BulkOp, len(keys))
 		for idx, key := range keys {
-			ops[idx] = &gocbV2.GetOp{ID: key}
+			ops[idx] = &gocb.GetOp{ID: key}
 		}
 		startTime := time.Now()
 		multiKey := strings.Join(keys[:], cc.COMMA)
@@ -161,15 +161,15 @@ func GetMultiDocV2(keys []string) (map[string]Result2, error) {
 		logElapsedTime(startTime, "GetMultiDocV2()", cc.DB_GET, multiKey)
 		if err == nil {
 			for _, op := range ops {
-				if getOp := op.(*gocbV2.GetOp); getOp.Err == nil {
+				if getOp := op.(*gocb.GetOp); getOp.Err == nil {
 					doc := resp[getOp.ID].Doc
 					getOp.Result.Content(&doc)
-					resp[getOp.ID] = Result2{Doc: doc, Cas: getOp.Result.Cas()}
+					resp[getOp.ID] = ResultV2{Doc: doc, Cas: getOp.Result.Cas()}
 				} else {
 					errs := strings.Split(getOp.Err.Error(), cc.PIPE)
 					if len(errs) > cc.ZERO {
 						opErr := errors.New(strings.TrimRight(errs[cc.ZERO], cc.SPACE))
-						resp[getOp.ID] = Result2{Err: opErr}
+						resp[getOp.ID] = ResultV2{Err: opErr}
 					}
 				}
 			}
@@ -189,14 +189,14 @@ func GetMultiDocV2(keys []string) (map[string]Result2, error) {
 	}
 }
 
-func DeleteMultiDocV2(docs map[string]gocbV2.Cas) (map[string]Result2, error) {
-	resp := make(map[string]Result2)
+func DeleteMultiDocV2(docs map[string]gocb.Cas) (map[string]ResultV2, error) {
+	resp := make(map[string]ResultV2)
 	if collection, idx := GetCollection(); collection != nil {
 		keys := make([]string, len(docs))
-		ops := make([]gocbV2.BulkOp, len(docs))
+		ops := make([]gocb.BulkOp, len(docs))
 		idx := cc.ZERO
 		for key, _ := range docs {
-			ops[idx] = &gocbV2.RemoveOp{ID: key}
+			ops[idx] = &gocb.RemoveOp{ID: key}
 			keys[idx] = key
 			idx += cc.ONE
 		}
@@ -207,14 +207,14 @@ func DeleteMultiDocV2(docs map[string]gocbV2.Cas) (map[string]Result2, error) {
 		logElapsedTime(startTime, "DeleteMultiDocV2()", cc.DB_DELETE, multiKey)
 		if err == nil {
 			for _, op := range ops {
-				removeOp := op.(*gocbV2.RemoveOp)
+				removeOp := op.(*gocb.RemoveOp)
 				if removeOp.Err == nil {
-					resp[removeOp.ID] = Result2{Cas: removeOp.Result.Cas()}
+					resp[removeOp.ID] = ResultV2{Cas: removeOp.Result.Cas()}
 				} else {
 					errs := strings.Split(removeOp.Err.Error(), cc.PIPE)
 					if len(errs) > cc.ZERO {
 						opErr := errors.New(strings.TrimRight(errs[cc.ZERO], cc.SPACE))
-						resp[removeOp.ID] = Result2{Err: opErr}
+						resp[removeOp.ID] = ResultV2{Err: opErr}
 					}
 				}
 			}
@@ -234,14 +234,14 @@ func DeleteMultiDocV2(docs map[string]gocbV2.Cas) (map[string]Result2, error) {
 	}
 }
 
-func InsertMultiDocV2(docs map[string]Result2) (map[string]Result2, error) {
-	resp := make(map[string]Result2)
+func InsertMultiDocV2(docs map[string]ResultV2) (map[string]ResultV2, error) {
+	resp := make(map[string]ResultV2)
 	if collection, idx := GetCollection(); collection != nil {
 		keys := make([]string, len(docs))
-		ops := make([]gocbV2.BulkOp, len(docs))
+		ops := make([]gocb.BulkOp, len(docs))
 		idx := cc.ZERO
 		for key, item := range docs {
-			ops[idx] = &gocbV2.InsertOp{ID: key, Value: item.Doc}
+			ops[idx] = &gocb.InsertOp{ID: key, Value: item.Doc}
 			keys[idx] = key
 			idx += cc.ONE
 		}
@@ -251,14 +251,14 @@ func InsertMultiDocV2(docs map[string]Result2) (map[string]Result2, error) {
 		logElapsedTime(startTime, "InsertMultiDocV2()", cc.BULK_INSERT, multiKey)
 		if err == nil {
 			for _, op := range ops {
-				insertOp := op.(*gocbV2.InsertOp)
+				insertOp := op.(*gocb.InsertOp)
 				if insertOp.Err == nil {
-					resp[insertOp.ID] = Result2{Cas: insertOp.Result.Cas()}
+					resp[insertOp.ID] = ResultV2{Cas: insertOp.Result.Cas()}
 				} else {
 					errs := strings.Split(insertOp.Err.Error(), cc.PIPE)
 					if len(errs) > cc.ZERO {
 						opErr := errors.New(strings.TrimRight(errs[cc.ZERO], cc.SPACE))
-						resp[insertOp.ID] = Result2{Err: opErr}
+						resp[insertOp.ID] = ResultV2{Err: opErr}
 					}
 				}
 			}
@@ -278,14 +278,14 @@ func InsertMultiDocV2(docs map[string]Result2) (map[string]Result2, error) {
 	}
 }
 
-func UpsertMultiDocV2(docs map[string]Result2) (map[string]Result2, error) {
-	resp := make(map[string]Result2)
+func UpsertMultiDocV2(docs map[string]ResultV2) (map[string]ResultV2, error) {
+	resp := make(map[string]ResultV2)
 	if collection, idx := GetCollection(); collection != nil {
 		keys := make([]string, len(docs))
-		ops := make([]gocbV2.BulkOp, len(docs))
+		ops := make([]gocb.BulkOp, len(docs))
 		idx := cc.ZERO
 		for key, item := range docs {
-			ops[idx] = &gocbV2.UpsertOp{ID: key, Value: item.Doc}
+			ops[idx] = &gocb.UpsertOp{ID: key, Value: item.Doc}
 			keys[idx] = key
 			idx += cc.ONE
 		}
@@ -295,14 +295,14 @@ func UpsertMultiDocV2(docs map[string]Result2) (map[string]Result2, error) {
 		logElapsedTime(startTime, "UpsertMultiDocV2()", cc.BULK_UPSERT, multiKey)
 		if err == nil {
 			for _, op := range ops {
-				upsertOp := op.(*gocbV2.UpsertOp)
+				upsertOp := op.(*gocb.UpsertOp)
 				if upsertOp.Err == nil {
-					resp[upsertOp.ID] = Result2{Cas: upsertOp.Result.Cas()}
+					resp[upsertOp.ID] = ResultV2{Cas: upsertOp.Result.Cas()}
 				} else {
 					errs := strings.Split(upsertOp.Err.Error(), cc.PIPE)
 					if len(errs) > cc.ZERO {
 						opErr := errors.New(strings.TrimRight(errs[cc.ZERO], cc.SPACE))
-						resp[upsertOp.ID] = Result2{Err: opErr}
+						resp[upsertOp.ID] = ResultV2{Err: opErr}
 					}
 				}
 			}
@@ -323,16 +323,16 @@ func UpsertMultiDocV2(docs map[string]Result2) (map[string]Result2, error) {
 }
 
 // PATCH DB APIs
-func PatchDocAddV2(key string, path string, value interface{}, cas gocbV2.Cas,
-	expiry time.Duration) (gocbV2.Cas, error) {
+func PatchDocAddV2(key string, path string, value interface{}, cas gocb.Cas,
+	expiry time.Duration) (gocb.Cas, error) {
 	if collection, idx := GetCollection(); collection != nil {
-		mutateInoptions := &gocbV2.MutateInOptions{
+		mutateInoptions := &gocb.MutateInOptions{
 			Expiry: expiry,
 			Cas:    cas,
 		}
 		startTime := time.Now()
-		subRes, err := collection.MutateIn(key, []gocbV2.MutateInSpec{
-			gocbV2.InsertSpec(path, value, nil)}, mutateInoptions)
+		subRes, err := collection.MutateIn(key, []gocb.MutateInSpec{
+			gocb.InsertSpec(path, value, nil)}, mutateInoptions)
 		logElapsedTime(startTime, "PatchDocAddV2()", cc.DB_PATCH, key)
 		if err == nil {
 			return subRes.Cas(), err
@@ -350,15 +350,15 @@ func PatchDocAddV2(key string, path string, value interface{}, cas gocbV2.Cas,
 	}
 }
 
-func PatchDocAddArrayV2(key string, path string, value interface{}, cas gocbV2.Cas,
-	expiry time.Duration) (gocbV2.Cas, error) {
+func PatchDocAddArrayV2(key string, path string, value interface{}, cas gocb.Cas,
+	expiry time.Duration) (gocb.Cas, error) {
 	if collection, idx := GetCollection(); collection != nil {
-		var mutateInoptions gocbV2.MutateInOptions
+		var mutateInoptions gocb.MutateInOptions
 		mutateInoptions.Expiry = expiry
 		mutateInoptions.Cas = cas
 		startTime := time.Now()
-		subRes, err := collection.MutateIn(key, []gocbV2.MutateInSpec{
-			gocbV2.ArrayInsertSpec(path, value, nil)}, &mutateInoptions)
+		subRes, err := collection.MutateIn(key, []gocb.MutateInSpec{
+			gocb.ArrayInsertSpec(path, value, nil)}, &mutateInoptions)
 		logElapsedTime(startTime, "PatchDocAddArrayV2()", cc.DB_PATCH, key)
 		if err == nil {
 			return subRes.Cas(), err
@@ -377,16 +377,16 @@ func PatchDocAddArrayV2(key string, path string, value interface{}, cas gocbV2.C
 
 }
 
-func PatchDocReplaceV2(key string, path string, value interface{}, cas gocbV2.Cas,
-	expiry time.Duration) (gocbV2.Cas, error) {
+func PatchDocReplaceV2(key string, path string, value interface{}, cas gocb.Cas,
+	expiry time.Duration) (gocb.Cas, error) {
 	if collection, idx := GetCollection(); collection != nil {
-		mutateInoptions := &gocbV2.MutateInOptions{
+		mutateInoptions := &gocb.MutateInOptions{
 			Expiry: expiry,
 			Cas:    cas,
 		}
 		startTime := time.Now()
-		subRes, err := collection.MutateIn(key, []gocbV2.MutateInSpec{
-			gocbV2.ReplaceSpec(path, value, nil)}, mutateInoptions)
+		subRes, err := collection.MutateIn(key, []gocb.MutateInSpec{
+			gocb.ReplaceSpec(path, value, nil)}, mutateInoptions)
 		logElapsedTime(startTime, "PatchDocReplaceV2()", cc.DB_PATCH, key)
 		if err == nil {
 			return subRes.Cas(), err
@@ -405,16 +405,16 @@ func PatchDocReplaceV2(key string, path string, value interface{}, cas gocbV2.Ca
 
 }
 
-func PatchDocUpsertV2(key string, path string, value interface{}, cas gocbV2.Cas,
-	expiry time.Duration) (gocbV2.Cas, error) {
+func PatchDocUpsertV2(key string, path string, value interface{}, cas gocb.Cas,
+	expiry time.Duration) (gocb.Cas, error) {
 	if collection, idx := GetCollection(); collection != nil {
-		mutateInoptions := &gocbV2.MutateInOptions{
+		mutateInoptions := &gocb.MutateInOptions{
 			Expiry: expiry,
 			Cas:    cas,
 		}
 		startTime := time.Now()
-		subRes, err := collection.MutateIn(key, []gocbV2.MutateInSpec{
-			gocbV2.UpsertSpec(path, value, nil)}, mutateInoptions)
+		subRes, err := collection.MutateIn(key, []gocb.MutateInSpec{
+			gocb.UpsertSpec(path, value, nil)}, mutateInoptions)
 		logElapsedTime(startTime, "PatchDocUpsertV2()", cc.DB_PATCH, key)
 		if err == nil {
 			return subRes.Cas(), err
@@ -433,16 +433,16 @@ func PatchDocUpsertV2(key string, path string, value interface{}, cas gocbV2.Cas
 
 }
 
-func PatchDocRemoveV2(key string, path string, cas gocbV2.Cas,
-	expiry time.Duration) (gocbV2.Cas, error) {
+func PatchDocRemoveV2(key string, path string, cas gocb.Cas,
+	expiry time.Duration) (gocb.Cas, error) {
 	if collection, idx := GetCollection(); collection != nil {
-		mutateInoptions := &gocbV2.MutateInOptions{
+		mutateInoptions := &gocb.MutateInOptions{
 			Expiry: expiry,
 			Cas:    cas,
 		}
 		startTime := time.Now()
-		subRes, err := collection.MutateIn(key, []gocbV2.MutateInSpec{
-			gocbV2.RemoveSpec(path, nil)}, mutateInoptions)
+		subRes, err := collection.MutateIn(key, []gocb.MutateInSpec{
+			gocb.RemoveSpec(path, nil)}, mutateInoptions)
 		logElapsedTime(startTime, "PatchDocRemoveV2()", cc.DB_PATCH, key)
 		if err == nil {
 			return subRes.Cas(), err
@@ -464,8 +464,8 @@ func PatchDocRemoveV2(key string, path string, cas gocbV2.Cas,
 func PatchDocTestV2(key string, path string, value interface{}) (bool, error) {
 	if collection, idx := GetCollection(); collection != nil {
 		startTime := time.Now()
-		subRes, err := collection.LookupIn(key, []gocbV2.LookupInSpec{
-			gocbV2.GetSpec(path, nil)}, nil)
+		subRes, err := collection.LookupIn(key, []gocb.LookupInSpec{
+			gocb.GetSpec(path, nil)}, nil)
 		logElapsedTime(startTime, "PatchDocTestV2()", cc.DB_PATCH, key)
 		if err == nil {
 			var data interface{}
@@ -500,21 +500,21 @@ func PatchDocTestV2(key string, path string, value interface{}) (bool, error) {
 	}
 }
 
-func PatchDocCopyV2(key string, frompath string, topath string, cas gocbV2.Cas,
-	expiry time.Duration) (gocbV2.Cas, error) {
+func PatchDocCopyV2(key string, frompath string, topath string, cas gocb.Cas,
+	expiry time.Duration) (gocb.Cas, error) {
 	if collection, idx := GetCollection(); collection != nil {
 		startTime := time.Now()
-		subRes, err := collection.LookupIn(key, []gocbV2.LookupInSpec{
-			gocbV2.GetSpec(frompath, nil)}, nil)
+		subRes, err := collection.LookupIn(key, []gocb.LookupInSpec{
+			gocb.GetSpec(frompath, nil)}, nil)
 		logElapsedTime(startTime, "PatchDocCopyV2()", cc.DB_PATCH, key)
 		var data interface{}
 		if err = subRes.ContentAt(cc.ZERO, &data); err == nil {
-			var mutateInoptions gocbV2.MutateInOptions
+			var mutateInoptions gocb.MutateInOptions
 			mutateInoptions.Expiry = expiry
 			mutateInoptions.Cas = cas
 			startTime = time.Now()
-			res, err := collection.MutateIn(key, []gocbV2.MutateInSpec{
-				gocbV2.UpsertSpec(topath, data, nil)}, &mutateInoptions)
+			res, err := collection.MutateIn(key, []gocb.MutateInSpec{
+				gocb.UpsertSpec(topath, data, nil)}, &mutateInoptions)
 			logElapsedTime(startTime, "PatchDocCopyV2()", cc.DB_PATCH, key)
 			if err != nil {
 				errs := strings.Split(err.Error(), cc.PIPE)
@@ -539,21 +539,21 @@ func PatchDocCopyV2(key string, frompath string, topath string, cas gocbV2.Cas,
 	}
 }
 
-func PatchDocMoveV2(key string, frompath string, topath string, cas gocbV2.Cas,
-	expiry time.Duration) (gocbV2.Cas, error) {
+func PatchDocMoveV2(key string, frompath string, topath string, cas gocb.Cas,
+	expiry time.Duration) (gocb.Cas, error) {
 	if collection, idx := GetCollection(); collection != nil {
 		startTime := time.Now()
-		subRes, err := collection.LookupIn(key, []gocbV2.LookupInSpec{
-			gocbV2.GetSpec(frompath, nil)}, nil)
+		subRes, err := collection.LookupIn(key, []gocb.LookupInSpec{
+			gocb.GetSpec(frompath, nil)}, nil)
 		logElapsedTime(startTime, "PatchDocMoveV2()", cc.DB_PATCH, key)
 		var data interface{}
 		if err = subRes.ContentAt(cc.ZERO, &data); err == nil {
-			var mutateInoptions gocbV2.MutateInOptions
+			var mutateInoptions gocb.MutateInOptions
 			mutateInoptions.Expiry = expiry
 			mutateInoptions.Cas = cas
 			startTime = time.Now()
-			res, err := collection.MutateIn(key, []gocbV2.MutateInSpec{gocbV2.RemoveSpec(frompath, nil),
-				gocbV2.UpsertSpec(topath, data, nil)}, &mutateInoptions)
+			res, err := collection.MutateIn(key, []gocb.MutateInSpec{gocb.RemoveSpec(frompath, nil),
+				gocb.UpsertSpec(topath, data, nil)}, &mutateInoptions)
 			logElapsedTime(startTime, "PatchDocMoveV2()", cc.DB_PATCH, key)
 			if err == nil {
 				return res.Cas(), err
@@ -576,16 +576,5 @@ func PatchDocMoveV2(key string, frompath string, topath string, cas gocbV2.Cas,
 		err := errors.New(cc.CONNECTION_SHUT_DOWN)
 		log.Print("PatchDocMoveV2", " idx= ", idx, " key= ", key, "DB Error:", err.Error())
 		return cc.ZERO, err
-	}
-}
-
-func logElapsedTime(startTime time.Time, dbFunc, method string, key string) {
-	elapsedTime := time.Since(startTime)
-	//Max DB allowed delays to log db elapsed time as error log
-	if elapsedTime.Milliseconds() > int64(CouchDbCfg.TolelateLatencyMs) {
-		log.Print("Exceeded db elapsed time for ", dbFunc, " key= ", key, " DB elapsed time:", elapsedTime)
-	} else {
-		//log.Print("Elapsed time for ", dbFunc, " key= ", key, " DB elapsed time=", elapsedTime)
-
 	}
 }
